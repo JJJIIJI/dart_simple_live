@@ -1,0 +1,91 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      # 1. 下载代码
+      - name: 下载代码
+        uses: actions/checkout@v4
+
+      # 2. 安装 Flutter
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: 'stable'
+          cache: true
+
+      # 3. 启用 Windows 桌面支持
+      - name: 启用 Windows 桌面
+        run: flutter config --enable-windows-desktop
+
+      # 4. 锁定依赖版本（防止新版依赖包原生代码不兼容导致编译失败）
+      - name: 锁定依赖版本
+        shell: bash
+        run: |
+          cat >> simple_live_app/pubspec.yaml << 'EOF'
+          dependency_overrides:
+            intl: ^0.19.0
+            dynamic_color: 1.8.1
+            auto_orientation_v2: 2.3.8
+            volume_controller: 3.4.0
+            screen_brightness: 2.1.7
+            wakelock_plus: 1.4.0
+            media_kit: 1.2.2
+            media_kit_video: 2.0.0
+            media_kit_libs_video: 1.0.7
+            connectivity_plus: 7.0.0
+            network_info_plus: 7.0.0
+            device_info_plus: 12.2.0
+            package_info_plus: 9.0.0
+            share_plus: 12.0.1
+            file_picker: 10.3.7
+            image_gallery_saver_plus: 4.0.1
+            qr_code_scanner_plus: 2.0.14
+            floating: 6.0.0
+            canvas_danmaku: 0.2.7
+            lottie: 3.3.2
+            flutter_smart_dialog: 4.9.8+9
+            extended_image: 10.0.1
+            permission_handler: 12.0.1
+          EOF
+
+      # 5. 安装依赖
+      - name: 安装依赖
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      # 6. 清理构建
+      - name: 清理构建
+        run: |
+          cd simple_live_app
+          flutter clean
+
+      # 7. 编译 Windows 版
+      - name: 编译 Windows
+        run: |
+          cd simple_live_app
+          flutter build windows --release
+
+      # 8. 打包为 ZIP
+      - name: 打包 ZIP
+        shell: pwsh
+        run: |
+          $buildDir = "simple_live_app\build\windows\x64\runner\Release"
+          if (-not (Test-Path $buildDir)) {
+            $buildDir = "simple_live_app\build\windows\runner\Release"
+          }
+          Compress-Archive -Path "$buildDir\*" -DestinationPath "simple_live_app_windows.zip"
+
+      # 9. 上传构建产物
+      - name: 上传 Windows 应用
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple_live_app_windows.zip
+          path: simple_live_app_windows.zip
+          retention-days: 7
