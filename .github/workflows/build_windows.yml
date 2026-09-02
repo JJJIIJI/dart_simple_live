@@ -3,6 +3,10 @@ name: Build Windows
 on:
   workflow_dispatch:
 
+env:
+  # 全局 MSVC 编译选项：抑制 experimental/coroutine 弃用错误
+  CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
+
 jobs:
   build:
     runs-on: windows-latest
@@ -23,7 +27,7 @@ jobs:
       - name: 启用 Windows 桌面
         run: flutter config --enable-windows-desktop
 
-      # 4. 锁定依赖版本
+      # 4. 锁定依赖版本（防止新版依赖包原生代码不兼容导致编译失败）
       - name: 锁定依赖版本
         shell: bash
         run: |
@@ -66,15 +70,15 @@ jobs:
           cd simple_live_app
           flutter clean
 
-      # 7. 修复 flutter_inappwebview 的协程弃用编译错误
-      - name: 修复 MSVC 协程弃用错误
+      # 7. 修复 CMake 兼容性问题（CMP0175 警告 + 协程弃用双重保险）
+      - name: 修复 CMake 兼容性问题
         shell: bash
         run: |
-          cat >> simple_live_app/windows/CMakeLists.txt << 'EOF'
-
-          # Fix flutter_inappwebview experimental coroutine deprecation error
-          add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
-          EOF
+          # 在 CMakeLists.txt 顶部注入 CMake 策略设置，解决 CMP0175 警告
+          sed -i '1s/^/cmake_policy(SET CMP0175 OLD)\n/' simple_live_app/windows/CMakeLists.txt
+          # 同时在 CMakeLists.txt 中也加入编译定义（双重保险）
+          echo "" >> simple_live_app/windows/CMakeLists.txt
+          echo "add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)" >> simple_live_app/windows/CMakeLists.txt
 
       # 8. 编译 Windows 版
       - name: 编译 Windows
