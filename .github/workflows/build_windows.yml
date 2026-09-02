@@ -23,7 +23,7 @@ jobs:
       - name: 启用 Windows 桌面
         run: flutter config --enable-windows-desktop
 
-      # 4. 锁定依赖版本（防止新版依赖包原生代码不兼容导致编译失败）
+      # 4. 锁定依赖版本
       - name: 锁定依赖版本
         shell: bash
         run: |
@@ -66,13 +66,23 @@ jobs:
           cd simple_live_app
           flutter clean
 
-      # 7. 编译 Windows 版
+      # 7. 修复 flutter_inappwebview 的协程弃用编译错误
+      - name: 修复 MSVC 协程弃用错误
+        shell: bash
+        run: |
+          cat >> simple_live_app/windows/CMakeLists.txt << 'EOF'
+
+          # Fix flutter_inappwebview experimental coroutine deprecation error
+          add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+          EOF
+
+      # 8. 编译 Windows 版
       - name: 编译 Windows
         run: |
           cd simple_live_app
           flutter build windows --release
 
-      # 8. 打包为 ZIP
+      # 9. 打包为 ZIP
       - name: 打包 ZIP
         shell: pwsh
         run: |
@@ -82,7 +92,7 @@ jobs:
           }
           Compress-Archive -Path "$buildDir\*" -DestinationPath "simple_live_app_windows.zip"
 
-      # 9. 上传构建产物
+      # 10. 上传构建产物
       - name: 上传 Windows 应用
         uses: actions/upload-artifact@v4
         with:
